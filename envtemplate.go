@@ -30,7 +30,7 @@ import (
 	tbnstrings "github.com/turbinelabs/nonstdlib/strings"
 )
 
-const TbnPublicVersion = "0.16.0"
+const TbnPublicVersion = "0.17.0"
 
 const (
 	description = `
