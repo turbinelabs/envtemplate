@@ -261,3 +261,58 @@ func TestRunSameFileNoBackup(t *testing.T) {
 	_, err = os.Stat(in + ".bak")
 	assert.True(t, os.IsNotExist(err))
 }
+
+func TestRunRequiredEnvSplit(t *testing.T) {
+	out := &bytes.Buffer{}
+	mockOS, finish := mkMockOs(t, `{{- range envSplit "BARS" ":"}}foo{{.}}{{- end}}`, out)
+	defer finish()
+
+	mockOS.EXPECT().LookupEnv("BARS").Return("baz:ham", true)
+
+	c := cmd()
+	r := c.Runner.(*runner)
+	r.os = mockOS
+
+	err := c.Flags.Parse([]string{"-vars", "bars=BARS"})
+	assert.Nil(t, err)
+
+	got := r.Run(c, nil)
+	assert.Equal(t, got, command.NoError())
+	assert.Equal(t, out.String(), "foobazfooham")
+}
+
+func TestRunRequiredEnvSplitSingle(t *testing.T) {
+	out := &bytes.Buffer{}
+	mockOS, finish := mkMockOs(t, `{{- range envSplit "BAR" ":"}}foo{{.}}{{- end}}`, out)
+	defer finish()
+
+	mockOS.EXPECT().LookupEnv("BAR").Return("baz", true)
+
+	c := cmd()
+	r := c.Runner.(*runner)
+	r.os = mockOS
+
+	err := c.Flags.Parse([]string{"-vars", "bar=BAR"})
+	assert.Nil(t, err)
+
+	got := r.Run(c, nil)
+	assert.Equal(t, got, command.NoError())
+	assert.Equal(t, out.String(), "foobaz")
+}
+
+func TestRunRequiredEnvSplitMissing(t *testing.T) {
+	mockOS, finish := mkMockOs(t, `{{- range envSplit "BARS" ":"}}foo{{.}}{{- end}}`, nil)
+	defer finish()
+
+	mockOS.EXPECT().LookupEnv("BARS").Return("", false)
+
+	c := cmd()
+	r := c.Runner.(*runner)
+	r.os = mockOS
+
+	err := c.Flags.Parse([]string{"-vars", "bars=BARS"})
+	assert.Nil(t, err)
+
+	got := r.Run(c, nil)
+	assert.Equal(t, got, c.Error(`template: :1:10: executing "" at <envSplit "BARS" ":">: error calling envSplit: no value for $BARS in environment`))
+}
