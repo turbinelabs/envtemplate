@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"strings"
 	"text/template"
 
 	"github.com/turbinelabs/cli"
@@ -37,7 +38,7 @@ const (
 Process a go-templated file, using environment and command-line variables
 for substitutions.
 
-Two functions are made avaiable to the templates:
+Three functions are made avaiable to the templates:
 
 {{ul "env"}}: used to specify a required environment variable:
     {{print "{{env \"TBN_HOME\""}}"}}
@@ -46,6 +47,11 @@ Two functions are made avaiable to the templates:
 with a default value, which can reference other environment variables:
     {{print "{{envOrDefault \"TBN_HOME\" \"~/$TBN_WORKSPACE/tbn\"}}"}}
 
+{{ul "envSplit"}}: used to slice a required environment variable
+separated by some character and return a slice of all the substrings
+between separators:
+	{{print "{{envSplit \"TBN_WORKSPACES\" \":\"}}"}}
+	
 Additional variable substitutions can be specified using the --var flag.
 `
 
@@ -152,11 +158,13 @@ func (r *runner) mkFuncMap() (template.FuncMap, error) {
 	predef := template.FuncMap{
 		"env":          r.env,
 		"envOrDefault": r.envOrDefault,
+		"envSplit":     r.envSplit,
 	}
 
 	funcs := template.FuncMap{
 		"env":          r.env,
 		"envOrDefault": r.envOrDefault,
+		"envSplit":     r.envSplit,
 	}
 
 	for _, kvStr := range r.vars.Strings {
@@ -194,6 +202,14 @@ func (r *runner) envOrDefault(key, defValue string) string {
 		return r.os.ExpandEnv(defValue)
 	}
 	return value
+}
+
+func (r *runner) envSplit(key string, sep string) ([]string, error) {
+	value, err := r.env(key)
+	if err != nil {
+		return []string(nil), err
+	}
+	return strings.Split(value, sep), nil
 }
 
 func mkCLI() cli.CLI {
